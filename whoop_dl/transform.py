@@ -57,18 +57,27 @@ _SLEEP_PANEL_KEYS = [
     "Sleep consistency %",
 ]
 
-# Fallback sport_id -> name (v2 normally returns sport_name directly).
-SPORT_NAMES = {
-    -1: "Activity", 0: "Running", 1: "Cycling", 6: "Soccer", 8: "Rowing",
-    9: "Cross Fit", 13: "Basketball", 14: "Strength Trainer", 15: "Swimming",
-    16: "Tennis", 17: "Football", 18: "Golf", 20: "Baseball", 21: "Hockey",
-    22: "Lacrosse", 28: "Stretching", 29: "Boxing", 33: "Volleyball",
-    34: "Wrestling", 35: "Track & Field", 36: "Hiking", 37: "Skiing",
-    38: "Snowboarding", 39: "Elliptical", 42: "Outdoor Bike", 44: "Walking",
-    45: "Cross Country Skiing", 57: "Pilates", 63: "Yoga", 64: "Meditation",
-    71: "Other", 127: "HIIT", 163: "Functional Fitness", 165: "Gymnastics",
-    166: "Weightlifting",
+# v2 returns sport_name as a lowercase slug (e.g. "mountain-biking",
+# "weightlifting_msk", "hot_tub"). We title-case it for the export. A couple of
+# slugs don't title-case cleanly, so override them explicitly.
+# NOTE: v2 sport_id numbering differs from v1 and is NOT a reliable name source,
+# so we key off sport_name only.
+_ACTIVITY_OVERRIDES = {
+    "hiit": "HIIT",
+    "weightlifting_msk": "Weightlifting",  # WHOOP's strength-strain variant
 }
+_ACTIVITY_ACRONYMS = {"hiit", "tv"}  # words to fully upper-case when title-casing
+
+
+def format_activity_name(slug):
+    """v2 sport_name slug -> readable name, e.g. 'mountain-biking' -> 'Mountain Biking'."""
+    if not slug:
+        return "Activity"
+    key = slug.strip().lower()
+    if key in _ACTIVITY_OVERRIDES:
+        return _ACTIVITY_OVERRIDES[key]
+    words = key.replace("-", " ").replace("_", " ").split()
+    return " ".join(w.upper() if w in _ACTIVITY_ACRONYMS else w.capitalize() for w in words)
 
 
 # --------------------------------------------------------------------------- #
@@ -298,7 +307,7 @@ def build_workout_rows(workouts, cycles):
             cycle_start = ""
             cycle_end = ""
 
-        name = wk.get("sport_name") or SPORT_NAMES.get(wk.get("sport_id"), "Activity")
+        name = format_activity_name(wk.get("sport_name"))
         gps = bool(score.get("distance_meter")) or bool(score.get("altitude_gain_meter"))
         z1, z2, z3, z4, z5 = _zone_pcts(score)
 
