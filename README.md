@@ -119,6 +119,24 @@ The internal `app.whoop.com` API (used by the WHOOP web app) can expose a few
 extra fields but is undocumented and unsupported. This tool deliberately uses
 only the official `api.prod.whoop.com/developer` v2 API.
 
+## Run both at once (`downloader`)
+
+A thin wrapper runs both exporters into one folder. Each source is independent —
+if WHOOP isn't authenticated, Wyze still exports (and vice versa).
+
+```bash
+pip install -r requirements.txt -r requirements-wyze.txt   # both toolsets
+
+python -m downloader                       # WHOOP + Wyze -> ./out/  (4 CSVs)
+python -m downloader --start 2026-01-01 --end 2026-06-28
+python -m downloader --out ./my_export/
+python -m downloader --skip-whoop          # Wyze only
+python -m downloader --skip-wyze           # WHOOP only
+```
+
+It prints a per-source SUMMARY at the end. Exit code is non-zero if any source
+failed. (WHOOP still requires a one-time `python -m whoop_dl auth login` first.)
+
 ## Companion: Wyze Scale downloader (`wyze_dl`)
 
 WHOOP's developer API does **not** expose body-composition data (body fat %,
@@ -199,6 +217,10 @@ whoop-downloader/
     transform.py        # ScaleRecord -> CSV row (units, tz, derived lean mass)
     export.py           # write body_composition.csv atomically
     cli.py              # argparse entrypoints
+  downloader/          # wrapper: runs both exporters into one folder
+    __init__.py
+    __main__.py         # python -m downloader
+    cli.py
   requirements.txt        # whoop_dl deps
   requirements-wyze.txt   # wyze_dl deps
   README.md
