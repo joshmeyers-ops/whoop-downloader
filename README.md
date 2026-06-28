@@ -119,19 +119,75 @@ The internal `app.whoop.com` API (used by the WHOOP web app) can expose a few
 extra fields but is undocumented and unsupported. This tool deliberately uses
 only the official `api.prod.whoop.com/developer` v2 API.
 
+## Companion: Wyze Scale downloader (`wyze_dl`)
+
+WHOOP's developer API does **not** expose body-composition data (body fat %,
+lean mass), even when you see it in the WHOOP app — that data is ingested from
+Health Connect / Withings / Wyze for display only. To get it, go to the source.
+
+`wyze_dl` pulls your Wyze Scale history (the same readings that flow
+Wyze → Health Connect → WHOOP) via the unofficial
+[`wyze-sdk`](https://github.com/shauntarves/wyze-sdk) and writes
+`body_composition.csv`: date, weight (lb + kg), body fat %, lean mass (derived
+as weight × (1 − body fat%), matching WHOOP), plus muscle mass, body water %,
+BMI, BMR, bone mineral, protein %, visceral fat, metabolic age.
+
+### Setup
+
+```bash
+pip install -r requirements-wyze.txt   # wyze-sdk (heavier; separate from whoop_dl)
+```
+
+Add Wyze credentials to the same `.env`:
+
+```
+WYZE_EMAIL=you@example.com
+WYZE_PASSWORD=your_password
+WYZE_KEY_ID=...        # from developer-api-console.wyze.com/#/apikey/view
+WYZE_API_KEY=...
+# WYZE_TOTP_KEY=...     # only if 2FA is enabled (base32 secret)
+```
+
+### Usage
+
+```bash
+python -m wyze_dl list                       # list scales (auth check)
+python -m wyze_dl export                      # all history -> ./out/body_composition.csv
+python -m wyze_dl export --start 2026-01-01   # date range
+```
+
+### Notes / known gaps
+- `wyze-sdk` is **unofficial / reverse-engineered** — Wyze can change auth and
+  break it. It is the current working method (Wyze has no public scale API).
+- Auth is plain credentials + API key — no browser flow, no token caching; it
+  logs in fresh each run.
+- Wyze has **no lean-mass field**; lean mass is computed as
+  `weight × (1 − body_fat%)`. Mass metrics (muscle, bone) are converted kg→lb;
+  percentages (body water, protein) are passed through. Verify a row against the
+  Wyze app once to confirm units.
+
 ## Project layout
 
 ```
 whoop-downloader/
-  whoop_dl/
+  whoop_dl/             # WHOOP exporter (requests + python-dateutil only)
     __init__.py
-    __main__.py     # python -m whoop_dl
-    auth.py         # OAuth flow, token storage + rotation/refresh
-    client.py       # paginated GET helpers, 429 retry
-    transform.py    # API JSON -> export row dicts (units, timezone)
-    export.py       # join cycles+recovery+sleep, write 3 CSVs atomically
-    cli.py          # argparse entrypoints
-  requirements.txt
+    __main__.py         # python -m whoop_dl
+    auth.py             # OAuth flow, token storage + rotation/refresh
+    client.py           # paginated GET helpers, 429 retry
+    transform.py        # API JSON -> export row dicts (units, timezone)
+    export.py           # join cycles+recovery+sleep, write 3 CSVs atomically
+    cli.py              # argparse entrypoints
+  wyze_dl/              # Wyze Scale exporter (needs wyze-sdk)
+    __init__.py
+    __main__.py         # python -m wyze_dl
+    config.py           # credential loading
+    client.py           # wyze-sdk wrapper: auth, list, fetch records
+    transform.py        # ScaleRecord -> CSV row (units, tz, derived lean mass)
+    export.py           # write body_composition.csv atomically
+    cli.py              # argparse entrypoints
+  requirements.txt        # whoop_dl deps
+  requirements-wyze.txt   # wyze_dl deps
   README.md
   .gitignore
 ```
