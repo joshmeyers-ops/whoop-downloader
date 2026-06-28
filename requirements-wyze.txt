@@ -1,2 +1,4 @@
 wyze-sdk>=2.2
 python-dateutil>=2.8
+certifi>=2024.0
+pip-system-certs>=4.0 ; sys_platform == "win32"

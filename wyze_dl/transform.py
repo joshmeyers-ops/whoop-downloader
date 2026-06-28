@@ -14,7 +14,7 @@ KG_TO_LB = 2.2046226218
 
 HEADERS = [
     "Date", "Weight (lb)", "Weight (kg)", "Body fat %", "Lean mass (lb)",
-    "Muscle mass (lb)", "Body water %", "BMI", "BMR (cal)",
+    "Lean mass %", "Muscle mass (lb)", "Body water %", "BMI", "BMR (cal)",
     "Bone mineral (lb)", "Protein %", "Visceral fat", "Metabolic age",
     "Source MAC", "Record ID",
 ]
@@ -50,8 +50,10 @@ def record_to_row(r):
     body_fat = r.body_fat
 
     lean_lb = ""
+    lean_pct = ""
     if weight_lb is not None and body_fat is not None:
         lean_lb = round(weight_lb * (1 - body_fat / 100), 1)
+        lean_pct = round(100 - body_fat, 1)  # lean/weight x 100 == 100 - body fat%
 
     return {
         "Date": _fmt_ts(r.measure_ts, r.timezone),
@@ -59,6 +61,7 @@ def record_to_row(r):
         "Weight (kg)": _r1(weight_kg),
         "Body fat %": _r1(body_fat),
         "Lean mass (lb)": lean_lb,
+        "Lean mass %": lean_pct,
         "Muscle mass (lb)": _kg_to_lb(r.muscle),
         "Body water %": _r1(r.body_water),
         "BMI": _r1(r.bmi),

@@ -156,9 +156,22 @@ python -m wyze_dl export                      # all history -> ./out/body_compos
 python -m wyze_dl export --start 2026-01-01   # date range
 ```
 
+Output columns: Date, Weight (lb), Weight (kg), Body fat %, Lean mass (lb),
+Lean mass %, Muscle mass (lb), Body water %, BMI, BMR (cal), Bone mineral (lb),
+Protein %, Visceral fat, Metabolic age, Source MAC, Record ID. The scale logs
+every step-on, so you may see several records seconds apart — all are kept.
+
 ### Notes / known gaps
 - `wyze-sdk` is **unofficial / reverse-engineered** — Wyze can change auth and
   break it. It is the current working method (Wyze has no public scale API).
+- **Windows SSL:** Wyze's device API (`api.wyzecam.com`) can fail cert
+  verification on Windows (`CERTIFICATE_VERIFY_FAILED`). `requirements-wyze.txt`
+  includes `pip-system-certs`, which routes verification through the Windows
+  trust store and fixes it. (Needed because of a missing intermediate cert / TLS
+  inspection, not a credential problem.)
+- **Auth needs a native Wyze password** — accounts that only use "Sign in with
+  Google/Apple" must set a password in the Wyze app first. 2FA accounts also
+  need `WYZE_TOTP_KEY`.
 - Auth is plain credentials + API key — no browser flow, no token caching; it
   logs in fresh each run.
 - Wyze has **no lean-mass field**; lean mass is computed as
