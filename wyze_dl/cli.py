@@ -36,9 +36,9 @@ def _cmd_export(args):
 
 
 def _cmd_login(args):
-    """Force a fresh login and cache the token (do this once after a 429 clears)."""
+    """Fresh login + cache the token (do this once after a 429 clears)."""
     try:
-        client.login(verbose=True)
+        client.login(verbose=True, force=args.force)
     except Exception as exc:  # noqa: BLE001
         print(f"[ERROR] {exc}", file=sys.stderr)
         return 1
@@ -62,9 +62,12 @@ def build_parser():
     sub.add_parser("list", help="list scales on the account (auth check)").set_defaults(
         func=_cmd_list
     )
-    sub.add_parser("login", help="force a fresh login and cache the token").set_defaults(
-        func=_cmd_login
+    p_login = sub.add_parser("login", help="fresh login and cache the token")
+    p_login.add_argument(
+        "--force", action="store_true",
+        help="override the local 429 cooldown guard",
     )
+    p_login.set_defaults(func=_cmd_login)
     sub.add_parser("logout", help="delete the cached token").set_defaults(
         func=_cmd_logout
     )

@@ -58,6 +58,40 @@ def clear_token():
 
 
 # --------------------------------------------------------------------------- #
+# Login cooldown guard
+# --------------------------------------------------------------------------- #
+# After a 429, refuse further login attempts for this long. Wyze restarts its
+# own block on every attempt, so throttling ourselves lets the block age out.
+COOLDOWN_PATH = os.path.join(TOKEN_DIR, "login_cooldown")
+LOGIN_COOLDOWN_SECONDS = 1800  # 30 min
+
+
+def _cooldown_remaining():
+    try:
+        with open(COOLDOWN_PATH, "r", encoding="utf-8") as fh:
+            ts = float(fh.read().strip())
+    except (OSError, ValueError):
+        return 0
+    return max(0, LOGIN_COOLDOWN_SECONDS - (time.time() - ts))
+
+
+def _set_cooldown():
+    os.makedirs(TOKEN_DIR, exist_ok=True)
+    try:
+        with open(COOLDOWN_PATH, "w", encoding="utf-8") as fh:
+            fh.write(str(time.time()))
+    except OSError:
+        pass
+
+
+def _clear_cooldown():
+    try:
+        os.remove(COOLDOWN_PATH)
+    except OSError:
+        pass
+
+
+# --------------------------------------------------------------------------- #
 # Client construction
 # --------------------------------------------------------------------------- #
 def _client_from_cache(creds, cached):
@@ -77,9 +111,23 @@ def _client_from_cache(creds, cached):
     )
 
 
-def login(creds=None, verbose=False):
-    """Full login via the (rate-limited) login endpoint. Caches the tokens."""
+def login(creds=None, verbose=False, force=False):
+    """Full login via the (rate-limited) login endpoint. Caches the tokens.
+
+    Honors a local cooldown after a 429 so repeated runs can't keep Wyze's
+    block alive. Pass force=True to override once you're sure it has cleared.
+    """
     from wyze_sdk import Client
+
+    remaining = _cooldown_remaining()
+    if remaining and not force:
+        mins = int(remaining // 60) + 1
+        raise RuntimeError(
+            f"Not attempting login: Wyze returned 429 recently, and every retry "
+            f"restarts its block. Local guard active for ~{mins} more min. Wait, "
+            f"then run `python -m wyze_dl login`. Use the WHOOP-only downloader "
+            f"meanwhile (WHOOP is unaffected)."
+        )
 
     creds = creds or config.get_creds()
     if verbose:
@@ -94,12 +142,14 @@ def login(creds=None, verbose=False):
         )
     except Exception as exc:  # noqa: BLE001
         if _is_rate_limited(exc):
+            _set_cooldown()
             raise RuntimeError(
-                "Wyze is temporarily rate-limiting logins (HTTP 429). Wait "
-                "~30-60 minutes, then try again. Avoid repeated runs in the "
-                "meantime -- each attempt restarts the cooldown."
+                "Wyze is rate-limiting logins (HTTP 429). A local guard will now "
+                "block further attempts for 30 min so the block can age out. Do "
+                "NOT keep running it -- each attempt restarts Wyze's timer."
             ) from exc
         raise
+    _clear_cooldown()
     _save_token(client)
     return client
 
