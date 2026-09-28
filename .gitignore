@@ -19,3 +19,6 @@ venv/
 
 # Guard against stray nested repo copies
 **/whoop-downloader/
+
+# Windows shortcuts (machine-specific)
+*.lnk
