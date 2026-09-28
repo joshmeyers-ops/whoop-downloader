@@ -13,3 +13,9 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+
+# Wyze token cache
+.wyze-downloader/
+
+# Guard against stray nested repo copies
+**/whoop-downloader/
