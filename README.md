@@ -172,6 +172,8 @@ WYZE_API_KEY=...
 python -m wyze_dl list                       # list scales (auth check)
 python -m wyze_dl export                      # all history -> ./out/body_composition.csv
 python -m wyze_dl export --start 2026-01-01   # date range
+python -m wyze_dl login                       # force a fresh login + cache token
+python -m wyze_dl logout                      # delete the cached token
 ```
 
 Output columns: Date, Weight (lb), Weight (kg), Body fat %, Lean mass (lb),
@@ -190,12 +192,42 @@ every step-on, so you may see several records seconds apart — all are kept.
 - **Auth needs a native Wyze password** — accounts that only use "Sign in with
   Google/Apple" must set a password in the Wyze app first. 2FA accounts also
   need `WYZE_TOTP_KEY`.
-- Auth is plain credentials + API key — no browser flow, no token caching; it
-  logs in fresh each run.
+- **Token caching (avoids 429):** Wyze aggressively rate-limits its *login*
+  endpoint. `wyze_dl` logs in once, caches the access/refresh tokens at
+  `~/.wyze-downloader/token.json`, and reuses them; expired tokens are renewed
+  via the refresh endpoint, not login. If you still hit
+  `429 Too Many Requests` on `.../user/login`, you triggered the limit earlier —
+  **wait ~30–60 min, don't retry repeatedly** (each attempt restarts the
+  cooldown), then run `python -m wyze_dl login` once to seed the cache.
 - Wyze has **no lean-mass field**; lean mass is computed as
   `weight × (1 − body_fat%)`. Mass metrics (muscle, bone) are converted kg→lb;
   percentages (body water, protein) are passed through. Verify a row against the
   Wyze app once to confirm units.
+
+## Journal / alcohol data (`journal_dl`)
+
+WHOOP's **journal / behavior data (alcohol yes/no, # of drinks, caffeine, etc.)
+is NOT in the developer API** — it exists only in WHOOP's manual account export.
+So this is a *file parser*, not an automated pull.
+
+1. In the WHOOP app: **Settings → Account → Export My Data**. WHOOP emails a zip
+   containing `journal_entries.csv`.
+2. Drop that file in this folder (or `./input/`, or pass `--file`).
+3. Inspect and parse:
+
+```bash
+python -m journal_dl questions    # list every journal question (confirm wording)
+python -m journal_dl export       # -> out/alcohol.csv + out/journal_all.csv
+```
+
+- `alcohol.csv` — one row per day: Date, Drank alcohol (true/false),
+  Number of drinks, and the raw journal detail (so nothing is guessed away).
+- `journal_all.csv` — every journal question/answer (long format), nothing lost.
+
+Columns are auto-detected by keyword, so header variations are tolerated. Run
+`questions` first to confirm how alcohol is worded in your export; if the parsed
+`drank`/`drinks` look off, that output shows exactly why. Granularity is per-day
+(tied to the cycle), not a timestamp per drink.
 
 ## Project layout
 
@@ -213,10 +245,15 @@ whoop-downloader/
     __init__.py
     __main__.py         # python -m wyze_dl
     config.py           # credential loading
-    client.py           # wyze-sdk wrapper: auth, list, fetch records
+    client.py           # wyze-sdk wrapper: cached-token auth, list, fetch records
     transform.py        # ScaleRecord -> CSV row (units, tz, derived lean mass)
     export.py           # write body_composition.csv atomically
-    cli.py              # argparse entrypoints
+    cli.py              # argparse entrypoints (list/login/logout/export)
+  journal_dl/          # parses WHOOP's manual-export journal_entries.csv
+    __init__.py
+    __main__.py         # python -m journal_dl
+    transform.py        # column detection + alcohol/journal row builders
+    cli.py              # questions / export commands
   downloader/          # wrapper: runs both exporters into one folder
     __init__.py
     __main__.py         # python -m downloader

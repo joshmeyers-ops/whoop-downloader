@@ -34,12 +34,8 @@ def export_all(out_dir="out", start=None, end=None, verbose=True):
     end_dt = end_dt.replace(hour=23, minute=59, second=59)
 
     if verbose:
-        print("Authenticating to Wyze...")
-    wyze = client.make_client()
-
-    if verbose:
         print(f"Fetching scale records ({start_dt.date()} -> {end_dt.date()})...")
-    records, scales = client.fetch_records(wyze, start_dt, end_dt, verbose=verbose)
+    records, scales = client.fetch_records(start_dt, end_dt, verbose=verbose)
 
     if verbose:
         names = ", ".join(getattr(s, "nickname", "?") or "?" for s in scales) or "(none listed)"

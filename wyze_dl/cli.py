@@ -8,8 +8,7 @@ from . import client, export
 
 def _cmd_list(args):
     try:
-        wyze = client.make_client()
-        scales = client.list_scales(wyze)
+        scales = client.list_scales(verbose=True)
     except Exception as exc:  # noqa: BLE001
         print(f"[ERROR] {exc}", file=sys.stderr)
         return 1
@@ -36,6 +35,23 @@ def _cmd_export(args):
     return 0
 
 
+def _cmd_login(args):
+    """Force a fresh login and cache the token (do this once after a 429 clears)."""
+    try:
+        client.login(verbose=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[ERROR] {exc}", file=sys.stderr)
+        return 1
+    print("[OK] Logged in. Token cached; future runs will reuse it (no re-login).")
+    return 0
+
+
+def _cmd_logout(args):
+    """Delete the cached token (next run logs in fresh)."""
+    print("Cached token removed." if client.clear_token() else "No cached token.")
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="wyze-dl",
@@ -45,6 +61,12 @@ def build_parser():
 
     sub.add_parser("list", help="list scales on the account (auth check)").set_defaults(
         func=_cmd_list
+    )
+    sub.add_parser("login", help="force a fresh login and cache the token").set_defaults(
+        func=_cmd_login
+    )
+    sub.add_parser("logout", help="delete the cached token").set_defaults(
+        func=_cmd_logout
     )
 
     p_export = sub.add_parser("export", help="scale history -> body_composition.csv")
